@@ -13,12 +13,18 @@ from django.http import StreamingHttpResponse
 from django.forms.models import model_to_dict
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes, action
 from .serializers import ConversationSerializer, MessageSerializer, PromptSerializer, SettingSerializer
 from utils.search_prompt import compile_prompt
 from utils.duckduckgo_search import web_search, SearchRequest
+
+
+
+class IsOwner(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
 
 
 class SettingViewSet(viewsets.ModelViewSet):
@@ -193,7 +199,10 @@ def conversation(request):
     presence_penalty = request.data.get('presence_penalty', 0)
     web_search_params = request.data.get('web_search')
     openai_api_key = request.data.get('openaiApiKey')
+    system_prompt = request.data.get("system_prompt", "You are a helpful assistant.")
     frugal_mode = request.data.get('frugalMode', False)
+
+    print(system_prompt)
 
     api_key = None
 
@@ -215,7 +224,9 @@ def conversation(request):
     model = get_current_model(model_name, request_max_response_tokens)
 
     try:
-        messages = build_messages(model, conversation_id, message, web_search_params, frugal_mode)
+        messages = build_messages(model, conversation_id, message, web_search_params, system_prompt, frugal_mode)
+
+        print(messages)
 
         if settings.DEBUG:
             print('messages:', messages)
@@ -330,7 +341,7 @@ def increase_token_usage(user, tokens, api_key=None):
         api_key.save()
 
 
-def build_messages(model, conversation_id, new_message_content, web_search_params, frugal_mode = False):
+def build_messages(model, conversation_id, new_message_content, web_search_params, system_prompt, frugal_mode = False):
     if conversation_id:
         ordered_messages = Message.objects.filter(conversation_id=conversation_id).order_by('created_at')
         ordered_messages_list = list(ordered_messages)
@@ -342,7 +353,7 @@ def build_messages(model, conversation_id, new_message_content, web_search_param
     if frugal_mode:
         ordered_messages_list = ordered_messages_list[-1:]
 
-    system_messages = [{"role": "system", "content": "You are a helpful assistant."}]
+    system_messages = [{"role": "system", "content": system_prompt}]
 
     current_token_count = num_tokens_from_messages(system_messages, model['name'])
 
