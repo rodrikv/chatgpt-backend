@@ -39,9 +39,7 @@ class IsOwner(BasePermission):
 class IsOwnerOfChat(BasePermission):
     def has_permission(self, request, view):
         conv_id = request.data.get("conversationId")
-        if Conversation.objects.filter(
-            conversation_id=conv_id, user=request.user
-        ).exists():
+        if Conversation.objects.filter(id=conv_id, user=request.user).exists():
             return True
         else:
             return False
