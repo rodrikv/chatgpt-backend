@@ -45,7 +45,6 @@ class IsOwnerOfChat(BasePermission):
             return True
         else:
             return False
-        return bool(request.user and request.user.is_authenticated)
 
 
 class SettingViewSet(viewsets.ModelViewSet):
