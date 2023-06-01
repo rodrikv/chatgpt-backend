@@ -38,7 +38,7 @@ class IsOwner(BasePermission):
 
 class IsOwnerOfChat(BasePermission):
     def has_permission(self, request, view):
-        conv_id = request.query_params.get("conversationId")
+        conv_id = request.data.get("conversationId")
         if Conversation.objects.filter(
             conversation_id=conv_id, user=request.user
         ).exists():
@@ -203,8 +203,25 @@ def gen_title(request):
         increase_token_usage(
             request.user, openai_response["usage"]["total_tokens"], api_key
         )
+    except openai.error.APIError as e:
+        # Handle API error here, e.g. retry or log
+        print(f"OpenAI API returned an API Error: {e}")
+        title = "Untitled Conversation"
+        pass
+    except openai.error.APIConnectionError as e:
+        # Handle connection error here
+        print(f"Failed to connect to OpenAI API: {e}")
+        title = "Untitled Conversation"
+        pass
+    except openai.error.RateLimitError as e:
+        # Handle rate limit error (we recommend using exponential backoff)
+        print(f"OpenAI API request exceeded rate limit: {e}")
+        title = "Untitled Conversation"
+        pass
+
     except Exception as e:
         print(e)
+
         title = "Untitled Conversation"
     # update the conversation title
     conversation_obj.topic = title
@@ -447,10 +464,11 @@ def get_current_model(model_name, request_max_response_tokens):
 
 
 def get_api_key_from_setting():
-    row = Setting.objects.filter(name="openai_api_key").first()
-    if row and row.value != "":
-        return row.value
-    return None
+    row = Setting.objects.filter(name="openai_api_key")
+    return row
+    # if row and row.value != "":
+    #     return row.value
+    # return None
 
 
 def get_api_key():
